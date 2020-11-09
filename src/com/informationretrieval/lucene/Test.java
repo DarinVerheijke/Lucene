@@ -7,11 +7,10 @@ import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 
-// Based on tutorials on https://www.tutorialspoint.com/lucene/lucene_indexing_process.htm and http://www.lucenetutorial.com/sample-apps/textfileindexer-java.html
+// Based on tutorials on https://www.tutorialspoint.com/lucene/lucene_indexing_process.htm and
+//  http://www.lucenetutorial.com/sample-apps/textfileindexer-java.html
 
 public class Test {
-    String indexDirectory = "./Index";
-    String dataDirectory = "./Data";
     Indexer indexer;
     Searcher searcher;
 
@@ -29,17 +28,17 @@ public class Test {
         }
     }
     private void createIndex() throws IOException {
-        indexer = new Indexer(indexDirectory);
+        indexer = new Indexer(Constants.index_dir);
         int num;
         long start = System.currentTimeMillis();
-        num = indexer.createIndex(dataDirectory);
+        num = indexer.addToIndex(Constants.data_dir);
         long end = System.currentTimeMillis();
         indexer.close();
         System.out.println(num+"Indexed, time: "+(end-start)+"ms");
     }
 
     private void search(String searchQuery) throws IOException, ParseException {
-        searcher = new Searcher(indexDirectory);
+        searcher = new Searcher(Constants.index_dir);
         long start = System.currentTimeMillis();
         TopDocs hits = searcher.search(searchQuery);
         long end = System.currentTimeMillis();

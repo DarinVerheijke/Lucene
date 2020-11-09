@@ -9,6 +9,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -24,6 +25,32 @@ import java.nio.file.Paths;
 public class Indexer {
     private final IndexWriter writer;
 
+    /**
+     * A main function that indexes one or more directories or files.
+     *
+     * @param args The command line arguments passed to this script.
+     *             The first argument should be the directory where the index should be stored, or "-" if the default
+     *             directory "./Index" should be used.
+     *             The other arguments are the directories and files that should be added to the index.
+     */
+    public static void main(String[] args) {
+        try {
+            String index_dir = args[0].equals("-") ? Constants.index_dir : args[0];
+            System.out.println("Creating index in directory " + index_dir);
+            Indexer indexer = new Indexer(index_dir);
+
+            int nr_files = 0;
+            long start = System.currentTimeMillis();
+            for (int index = 1; index < args.length; ++index)
+                nr_files += indexer.addToIndex(args[index]);
+            long end = System.currentTimeMillis();
+
+            indexer.close();
+            System.out.println(nr_files + " files indexed, time: " + (end - start) + "ms");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * The constructor; initialises the `writer` object.
@@ -77,19 +104,42 @@ public class Indexer {
     }
 
     /**
-     * Adds all files in a directory to the index.
+     * Adds a file or all files in a directory to the index.
      *
-     * @param directoryPath The directory path containing the files that are to be added to the index.
+     * @param path The file or directory path containing the files that are to be added to the index.
      * @return The number of files that were added to the index.
      */
-    public int createIndex(String directoryPath) throws IOException {
-        File[] files = new File(directoryPath).listFiles();
-        for (File file : files) {
-            if (!file.isDirectory() && !file.isHidden() && file.exists() && file.canRead()
-            ) {
-                indexFile(file);
-            }
+    public int addToIndex(String path) throws IOException {
+        File file_or_dir = new File(path);
+
+        // Skip non-existent and unreadable files/directories
+        // Don't skip hidden files/directories here because they've been explicitly requested by the caller
+        if (!file_or_dir.exists() || !file_or_dir.canRead())
+            throw new FileNotFoundException(path + " doesn't exist or is unreadable.");
+        // Simply add files to the index
+        else if (file_or_dir.isFile()) {
+            indexFile(file_or_dir);
+            return 1;
         }
-        return writer.numRamDocs();
+        // Add all files in a directory to the index
+        else {
+            File[] files = file_or_dir.listFiles();
+            // If the previous statement for some reason returned a null pointer
+            if (files == null)
+                return 0;
+
+            for (File file : files) {
+                // Skip non-existent and unreadable files/directories
+                // Skip hidden files/directories as well
+                if (!file.exists() || !file.canRead() || file.isHidden())
+                    continue;
+                // Recursively add all files in sub-directories as well
+                else if (file.isDirectory())
+                    addToIndex(file.getAbsolutePath());
+                else
+                    indexFile(file);
+            }
+            return writer.numRamDocs();
+        }
     }
 }
