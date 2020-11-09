@@ -10,8 +10,8 @@ import org.apache.lucene.search.TopDocs;
 // Based on tutorials on https://www.tutorialspoint.com/lucene/lucene_indexing_process.htm and http://www.lucenetutorial.com/sample-apps/textfileindexer-java.html
 
 public class Test {
-    String indexDirectory = "/home/darin/IdeaProjects/Lucene/Index";
-    String dataDirectory = "/home/darin/IdeaProjects/Lucene/Data";
+    String indexDirectory = "./Index";
+    String dataDirectory = "./Data";
     Indexer indexer;
     Searcher searcher;
 
