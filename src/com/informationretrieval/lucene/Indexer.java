@@ -2,20 +2,30 @@ package com.informationretrieval.lucene;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
 
+import javax.print.Doc;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.HashMap;
 
 // Based on tutorials on https://www.tutorialspoint.com/lucene/lucene_indexing_process.htm and
 //  http://www.lucenetutorial.com/sample-apps/textfileindexer-java.html
+
 
 /**
  * A class that offers indexing functionality. The created indices are stored in the directory that is passed to the
@@ -58,8 +68,10 @@ public class Indexer {
      * @param directoryPath The directory used to store the index.
      */
     public Indexer(String directoryPath) throws IOException {
-
         Directory dir = FSDirectory.open(Paths.get(directoryPath));
+        for (String file: dir.listAll())
+            dir.deleteFile(file);
+
         StandardAnalyzer analyzer = new StandardAnalyzer();
         IndexWriterConfig config = new IndexWriterConfig(analyzer);
         writer = new IndexWriter(dir, config);
@@ -141,5 +153,61 @@ public class Indexer {
             }
             return writer.numRamDocs();
         }
+    }
+
+    /**
+     * A subclass of `DefaultHandler` that implements the `startElement` function.
+     */
+    private class SODumpHandler extends DefaultHandler {
+
+        /**
+         * A function that is called whenever a starting XML tag has been read. All tags that don't start with the
+         * character 'r' are ignored. This is because we assume that the only tags that will be read are `row` tags and
+         * a single `posts` tag. This means that we can compare the two tags more efficiently by only comparing the
+         * first character.
+         *
+         * @param uri The namespace URI; this parameter is not used.
+         * @param localname The local name (without prefix); this parameter is not used.
+         * @param qname The qualified name, or in this case the type of tag.
+         * @param attributes The attributes of the element.
+         */
+        public void startElement(String uri, String localname, String qname, Attributes attributes) {
+            if (qname.charAt(0) != 'r')
+                return;
+            Document document = new Document();
+            String type = attributes.getValue("PostTypeId"); // 1: question ; 2: answer
+
+            document.add(new TextField("id", attributes.getValue("Id"), Field.Store.YES));
+            document.add(new TextField("contents", attributes.getValue("Body"), Field.Store.YES));
+            // For questions: also include the title
+            if (type.equals("1"))
+                document.add(new TextField("title", attributes.getValue("Title"), Field.Store.YES));
+
+            try {
+                writer.addDocument(document);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Reads the stackoverflow dump XML file and adds its posts to the index.
+     *
+     * @param file The XML dump file.
+     *
+     * @return The number of posts that was added to the index.
+     */
+    public int addDumpToIndex(File file) {
+        try {
+            SAXParserFactory factory = SAXParserFactory.newInstance();
+            SAXParser parser = factory.newSAXParser();
+            DefaultHandler handler = new SODumpHandler();
+
+            parser.parse(file, handler);
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            e.printStackTrace();
+        }
+        return writer.numRamDocs();
     }
 }
