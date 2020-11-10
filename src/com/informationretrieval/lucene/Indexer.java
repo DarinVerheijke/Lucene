@@ -13,6 +13,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import javax.print.Doc;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -51,8 +52,12 @@ public class Indexer {
 
             int nr_files = 0;
             long start = System.currentTimeMillis();
-            for (int index = 1; index < args.length; ++index)
-                nr_files += indexer.addToIndex(args[index]);
+            for (int index = 1; index < args.length; ++index) {
+                if (args[index].endsWith(".xml"))
+                    nr_files += indexer.addDumpToIndex(new File(args[index]));
+                else
+                    nr_files += indexer.addToIndex(args[index]);
+            }
             long end = System.currentTimeMillis();
 
             indexer.close();
@@ -122,6 +127,7 @@ public class Indexer {
      * @return The number of files that were added to the index.
      */
     public int addToIndex(String path) throws IOException {
+        int initial_nr = writer.getDocStats().numDocs;
         File file_or_dir = new File(path);
 
         // Skip non-existent and unreadable files/directories
@@ -151,7 +157,7 @@ public class Indexer {
                 else
                     indexFile(file);
             }
-            return writer.numRamDocs();
+            return writer.getDocStats().numDocs - initial_nr;
         }
     }
 
@@ -196,11 +202,13 @@ public class Indexer {
      *
      * @param file The XML dump file.
      *
-     * @return The number of posts that was added to the index.
+     * @return The number of posts in total in the index.
      */
     public int addDumpToIndex(File file) {
+        int initial_nr = writer.getDocStats().numDocs;
         try {
             SAXParserFactory factory = SAXParserFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, false);
             SAXParser parser = factory.newSAXParser();
             DefaultHandler handler = new SODumpHandler();
 
@@ -208,6 +216,6 @@ public class Indexer {
         } catch (ParserConfigurationException | SAXException | IOException e) {
             e.printStackTrace();
         }
-        return writer.numRamDocs();
+        return writer.getDocStats().numDocs - initial_nr;
     }
 }
