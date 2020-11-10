@@ -183,11 +183,13 @@ public class Indexer {
             Document document = new Document();
             String type = attributes.getValue("PostTypeId"); // 1: question ; 2: answer
 
-            document.add(new TextField("id", attributes.getValue("Id"), Field.Store.YES));
             document.add(new TextField("contents", attributes.getValue("Body"), Field.Store.YES));
-            // For questions: also include the title
+            document.add(new TextField("id", attributes.getValue("Id"), Field.Store.YES));
+            // For questions: also include the title, for answers: also include the parent question ID
             if (type.equals("1"))
                 document.add(new TextField("title", attributes.getValue("Title"), Field.Store.YES));
+            else
+                document.add(new TextField("parent", attributes.getValue("ParentId"), Field.Store.YES));
 
             try {
                 writer.addDocument(document);

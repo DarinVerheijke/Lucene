@@ -5,6 +5,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
@@ -54,8 +55,12 @@ public class Searcher {
             System.out.println(hits.totalHits + " documents found, time: " + (end - start) + "ms");
             for (ScoreDoc score_doc: hits.scoreDocs) {
                 Document document = searcher.getDocument(score_doc);
-                System.out.println("(" + score_doc.score + ") \t" + document.getField("filename").stringValue());
+
+                System.out.println("----------------------------------------");
+                for (IndexableField field: document.getFields())
+                    System.out.println(field.name() + "\t" + field.stringValue());
             }
+            System.out.println("----------------------------------------");
         } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
