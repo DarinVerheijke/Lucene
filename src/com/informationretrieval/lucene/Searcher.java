@@ -39,21 +39,24 @@ public class Searcher {
      * @param args The command line arguments passed to this script.
      *             The first argument should be the directory in which the index is stored, or "-" if the default
      *             directory "./Index" should be used.
+     *             The second argument should be the path to the stackoverflow dump file.
      *             The other arguments are the query parameters.
      */
     public static void main(String[] args) {
+        if (args.length < 3)
+            System.out.println("Too few arguments, expected: <index_dir>|'-' <so_dump> <query_param>*");
         try {
             String index_dir = args[0].equals("-") ? Constants.index_dir : args[0];
             System.out.println("Searching through index in " + index_dir);
             Searcher searcher = new Searcher(index_dir);
 
-            String query = String.join("", Arrays.copyOfRange(args, 1, args.length));
+            String query = String.join("", Arrays.copyOfRange(args, 2, args.length));
             long start = System.currentTimeMillis();
             TopDocs hits = searcher.search(query);
             long end = System.currentTimeMillis();
 
             System.out.println(hits.totalHits + " documents found, time: " + (end - start) + "ms");
-            RandomAccessFile file = new RandomAccessFile("/home/jules/Downloads/stackoverflow.com-Posts/Posts.xml", "r");
+            RandomAccessFile file = new RandomAccessFile(args[1], "r");
             for (ScoreDoc score_doc: hits.scoreDocs) {
                 Document document = searcher.getDocument(score_doc);
 
