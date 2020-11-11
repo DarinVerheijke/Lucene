@@ -61,7 +61,7 @@ public class Indexer {
             long end = System.currentTimeMillis();
 
             indexer.close();
-            System.out.println(nr_files + " files indexed, time: " + (end - start) + "ms");
+            System.out.println(nr_files + " documents indexed, time: " + (end - start) + "ms");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -183,12 +183,11 @@ public class Indexer {
             Document document = new Document();
             String type = attributes.getValue("PostTypeId"); // 1: question ; 2: answer
 
-            document.add(new TextField("contents", attributes.getValue("Body"), Field.Store.YES));
+            document.add(new TextField("contents", attributes.getValue("Body"), Field.Store.NO));
             document.add(new TextField("id", attributes.getValue("Id"), Field.Store.YES));
-            // For questions: also include the title, for answers: also include the parent question ID
-            if (type.equals("1"))
+            if (type.equals("1"))       // For questions, also include the title
                 document.add(new TextField("title", attributes.getValue("Title"), Field.Store.YES));
-            else
+            else if (type.equals("2"))  // For answers, also include the parent question
                 document.add(new TextField("parent", attributes.getValue("ParentId"), Field.Store.YES));
 
             try {
