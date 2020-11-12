@@ -22,21 +22,18 @@ This should then be concatenated with one of the following commands.
 ### Indexer
 
 ```bash
-Indexer <index>|"-" <file or directory>*|"-"
+Indexer [-i|--index <index>] [-d|--dump] <document>*
 ```
 
 - **\<index\>** is the directory where the resulting index files will be stored.
 This directory will be created if it doesn't exist yet, and cleared if it does
-exist. This argument can also be replaced by a literal `-`, in which case a
-default directory (`./Index`) is used.
+exist. If this is not specified, then the default `./Index` is used.
 
-- **\<file or directory\>** is a file or directory that should be indexed.
-Directories will be traversed recursively. This means that all files in the
-directory, or any of its subdirectories, will be added to the index. Hidden
-and unreadable files will be skipped. Hidden files can, however, still be
-indexed if the user explicitly adds them to the argument list.
-If a single **\<file or directory\>** is given that is `-`, then a default
-file (`./Posts.xml`) is indexed.
+- **\<document\>** is a file that should be indexed. This could also be a
+directory, in which case all of its files are indexed, and (recursively) all of
+its subdirectories' files. If `-d|--dump` is also included in the argument
+string, then this list is allowed to be empty, and the default `./Posts.xml` is
+indexed.
 
 The output of executing this file looks like this (5206682ms &#8776; 86.8min):
 
@@ -48,19 +45,18 @@ Creating index in directory ./Index
 ### Searcher
 
 ```bash
-Searcher <index>|"-" <SO dump>|"-"|"!" <query parameter>*
+Searcher [-i|--index <index>] [-d|--dump <SO dump>] <query parameter>+
 ```
 
-- **\<index\>** is the directory where the index, in which to search, is
-located. The default (`./Index`) can also be used by substituting this
-parameter with a literal `-`.
+- **\<index\>** is the directory where the index in which to search, is located.
+If this option is not specified, then the default `./Index` is used.
 
-- **\<SO dump\>** is the SO dump file from which the index was created. The
-default (`./Posts.xml`) can, again, be substituted with `-`. If the index
-wasn't created from the SO dump, then a literal `!` should be given.
+- **\<SO dump\>** is the SO dump file from which the index was created. If this
+option is not specified, then the default `./Posts.xml` is used. If the index
+was not created from the SO dump, then this option can be ignored.
 
-- **\<query parameter\>** is a single query parameter. An overview of the syntax
-can be found on [this page](
+- **\<query parameter\>+** is the list of query parameters. There should always
+be at least 1 parameter. An overview of the syntax can be found on [this page](
 https://lucene.apache.org/core/8_6_3/queryparser/index.html#package.description
 ).
 

@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Vector;
 
 // Based on tutorials on https://www.tutorialspoint.com/lucene/lucene_indexing_process.htm and
 //  http://www.lucenetutorial.com/sample-apps/textfileindexer-java.html
@@ -35,33 +36,43 @@ public class Searcher {
     /**
      * A main function that performs a query on an index.
      *
-     * @param args The command line arguments passed to this script.
-     *             The first argument should be the directory in which the index is stored, or "-" if the default
-     *             directory "./Index" should be used.
-     *             The second argument should be the path to the stackoverflow dump file. If the documents didn't come
-     *             from the stackoverflow dump, then this parameter should be "!". If they did come from the
-     *             stackoverflow dump and "-" was given, then the default "./Posts.xml" is used to retrieve the
-     *             resulting posts from.
-     *             The other arguments are the query parameters.
+     * @param args The command line arguments passed to this script. There are a couple of options available that allow
+     *             you to change the directory used to store the index, and to specify the path to a stackoverflow dump.
+     *             The other arguments are the query parameters. Additional information can be found in `usage` below.
      */
     public static void main(String[] args) {
-        if (args.length < 3) {
-            System.out.println("Too few arguments, expected: <index_dir>|'-' <so_dump>|'-'|'!' <query_param>*");
-            return;
+        final String usage = "Searcher [options] query_param+\n" +
+                " -h,--help    Display the available options and required arguments.\n" +
+                " -i,--index   The directory that stores the index. [default = ./Index]\n" +
+                " -d,--dump    The stackoverflow dump file (if that's what was indexed). [default = ./Posts.xml]\n" +
+                " query_param+ The query parameters.\n";
+        String index_dir = Constants.index_dir;
+        String dump_file = Constants.dump_file;
+        Vector<String> query_params = new Vector<>();
+
+        // Parse the argument string
+        for (int index = 0; index < args.length; ++index) {
+            switch (args[index]) {
+                case "-h", "--help" -> {
+                    System.out.println("Usage: " + usage);
+                    return;
+                }
+                case "-i", "--index" -> index_dir = args[++index];
+                case "-d", "--dump" -> dump_file = args[++index];
+                default -> query_params.add(args[index]);
+            }
         }
+        // If there is no query we can't execute it either
+        if (query_params.isEmpty())
+            throw new IllegalArgumentException("Expected at least one query parameter, usage:\n\t" + usage);
+
         try {
-            // Substitute the `-` arguments with the default values if necessary
-            String index_dir = args[0].equals("-") ? Constants.index_dir : args[0];
-            String dump_file = args[1].equals("-") ? Constants.dump_file : args[1];
             System.out.println("Searching through index in " + index_dir);
 
             long start = System.currentTimeMillis();
             Searcher searcher = new Searcher(index_dir);
-            String query = String.join("", Arrays.copyOfRange(args, 2, args.length));
-            TopDocs hits = searcher.search(query);
+            TopDocs hits = searcher.search(String.join(" ", query_params));
 
-            // Open the SO dump if the argument give isn't '!'
-            RandomAccessFile file = dump_file.equals("!") ? null : new RandomAccessFile(dump_file, "r");
             for (ScoreDoc score_doc : hits.scoreDocs) {
                 Document document = searcher.getDocument(score_doc);
 
@@ -71,9 +82,11 @@ public class Searcher {
 
                 // If the document has an ID field, then we assume that it was indexed from the stackoverflow dump
                 // This means that we can use it to retrieve the complete XML element from the dump file
-                if (document.getField("id") != null && file != null) {
+                if (document.getField("id") != null) {
+                    RandomAccessFile file = new RandomAccessFile(dump_file, "r");
                     String element = getPost(file, Integer.parseUnsignedInt(document.getField("id").stringValue()));
                     System.out.println(element.replace("\" ", "\"\n\t"));
+                    file.close();
                 }
             }
             System.out.println("----------------------------------------");

@@ -21,6 +21,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Vector;
 
 // Based on tutorials on https://www.tutorialspoint.com/lucene/lucene_indexing_process.htm and
 //  http://www.lucenetutorial.com/sample-apps/textfileindexer-java.html
@@ -44,27 +45,46 @@ public class Indexer {
      *             additional argument is "-", then the default "./Posts.xml" will be used.
      */
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.println("Too few arguments, expected: <index_dir>|'-' <file_or_dir>*|'-'");
-            return;
+        final String usage = "Indexer [options] document+\n" +
+                " -h,--help  Display the available options and required arguments.\n" +
+                " -i,--index The directory that stores the new index. [default = ./Index]\n" +
+                " -d,--dump  An indicator that the (XML) documents should be read as stackoverflow dumps.\n" +
+                "            If this flag is set and no document are given, then ./Posts.xml is read.\n" +
+                " document+  The files that should be indexed.\n";
+        String index_dir = Constants.index_dir;
+        boolean dump_file = false;
+        Vector<String> documents = new Vector<>();
+
+        for (int index = 0; index < args.length; ++index) {
+            switch (args[index]) {
+                case "-h", "--help" -> {
+                    System.out.println("Usage: " + usage);
+                    return;
+                }
+                case "-i", "--index" -> index_dir = args[++index];
+                case "-d", "--dump" -> dump_file = true;
+                default -> documents.add(args[index]);
+            }
         }
+        if (documents.isEmpty() && !dump_file)
+            throw new IllegalArgumentException("\nExpected at least one argument, usage: " + usage);
+        else if (documents.isEmpty())
+            documents.add(Constants.dump_file);
+
         try {
-            String index_dir = args[0].equals("-") ? Constants.index_dir : args[0];
-            if (args.length == 2 && args[1].equals("-"))
-                args[1] = Constants.dump_file;
             Indexer indexer = new Indexer(index_dir);
 
             System.out.println("Creating index in directory " + index_dir);
             long start_nr = indexer.writer.getDocStats().numDocs;
             long start = System.currentTimeMillis();
 
-            for (int index = 1; index < args.length; ++index) {
+            for (String filename: documents) {
                 // Assuming all XML files are the stackoverflow dump if they're given directly by the user
                 // XML files in a directory that is being indexed won't be treated as such
-                if (args[index].endsWith(".xml"))
-                    indexer.addDumpToIndex(new File(args[index]));
+                if (dump_file && filename.endsWith(".xml"))
+                    indexer.addDumpToIndex(new File(filename));
                 else
-                    indexer.addToIndex(args[index]);
+                    indexer.addToIndex(filename);
             }
 
             long end = System.currentTimeMillis();
