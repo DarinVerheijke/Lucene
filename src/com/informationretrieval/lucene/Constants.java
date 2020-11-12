@@ -6,6 +6,8 @@ package com.informationretrieval.lucene;
 public class Constants {
     public static final String index_dir = "./Index";
     public static final String data_dir = "./Data";
+    public static final String dump_file = "./Posts.xml";
+
     public static final String contents = "contents";
     public static final String file_name = "filename";
     public static final String file_path = "filepath";

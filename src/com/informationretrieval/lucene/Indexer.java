@@ -12,7 +12,6 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-import javax.print.Doc;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -22,7 +21,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.HashMap;
 
 // Based on tutorials on https://www.tutorialspoint.com/lucene/lucene_indexing_process.htm and
 //  http://www.lucenetutorial.com/sample-apps/textfileindexer-java.html
@@ -42,26 +40,38 @@ public class Indexer {
      * @param args The command line arguments passed to this script.
      *             The first argument should be the directory where the index should be stored, or "-" if the default
      *             directory "./Index" should be used.
-     *             The other arguments are the directories and files that should be added to the index.
+     *             The other arguments are the directories and files that should be added to the index. If the only
+     *             additional argument is "-", then the default "./Posts.xml" will be used.
      */
     public static void main(String[] args) {
+        if (args.length < 2) {
+            System.out.println("Too few arguments, expected: <index_dir>|'-' <file_or_dir>*|'-'");
+            return;
+        }
         try {
             String index_dir = args[0].equals("-") ? Constants.index_dir : args[0];
-            System.out.println("Creating index in directory " + index_dir);
+            if (args.length == 2 && args[1].equals("-"))
+                args[1] = Constants.dump_file;
             Indexer indexer = new Indexer(index_dir);
 
-            int nr_files = 0;
+            System.out.println("Creating index in directory " + index_dir);
+            long start_nr = indexer.writer.getDocStats().numDocs;
             long start = System.currentTimeMillis();
+
             for (int index = 1; index < args.length; ++index) {
+                // Assuming all XML files are the stackoverflow dump if they're given directly by the user
+                // XML files in a directory that is being indexed won't be treated as such
                 if (args[index].endsWith(".xml"))
-                    nr_files += indexer.addDumpToIndex(new File(args[index]));
+                    indexer.addDumpToIndex(new File(args[index]));
                 else
-                    nr_files += indexer.addToIndex(args[index]);
+                    indexer.addToIndex(args[index]);
             }
+
             long end = System.currentTimeMillis();
+            long end_nr = indexer.writer.getDocStats().numDocs;
+            System.out.println((end_nr - start_nr) + " documents indexed, time: " + (end - start) + "ms");
 
             indexer.close();
-            System.out.println(nr_files + " documents indexed, time: " + (end - start) + "ms");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -178,6 +188,7 @@ public class Indexer {
          * @param attributes The attributes of the element.
          */
         public void startElement(String uri, String localname, String qname, Attributes attributes) {
+            // Verify that the current element's name starts with 'r', which should only be for 'row' elements
             if (qname.charAt(0) != 'r')
                 return;
             Document document = new Document();
@@ -185,9 +196,10 @@ public class Indexer {
 
             document.add(new TextField("contents", attributes.getValue("Body"), Field.Store.NO));
             document.add(new TextField("id", attributes.getValue("Id"), Field.Store.YES));
-            // For questions, also include the title
-            if (type == '1')
+            if (type == '1')        // For questions, also include the title
                 document.add(new TextField("title", attributes.getValue("Title"), Field.Store.NO));
+            else if (type == '2')   // For answers, also include the question
+                document.add(new TextField("parent", attributes.getValue("ParentId"), Field.Store.NO));
 
             try {
                 writer.addDocument(document);
@@ -208,6 +220,7 @@ public class Indexer {
         int initial_nr = writer.getDocStats().numDocs;
         try {
             SAXParserFactory factory = SAXParserFactory.newInstance();
+            // Without disabling FEATURE_SECURE_PROCESSING the parser stops at 50.000.000
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, false);
             SAXParser parser = factory.newSAXParser();
             DefaultHandler handler = new SODumpHandler();

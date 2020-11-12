@@ -14,7 +14,6 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Paths;
@@ -39,34 +38,48 @@ public class Searcher {
      * @param args The command line arguments passed to this script.
      *             The first argument should be the directory in which the index is stored, or "-" if the default
      *             directory "./Index" should be used.
-     *             The second argument should be the path to the stackoverflow dump file.
+     *             The second argument should be the path to the stackoverflow dump file. If the documents didn't come
+     *             from the stackoverflow dump, then this parameter should be "!". If they did come from the
+     *             stackoverflow dump and "-" was given, then the default "./Posts.xml" is used to retrieve the
+     *             resulting posts from.
      *             The other arguments are the query parameters.
      */
     public static void main(String[] args) {
-        if (args.length < 3)
-            System.out.println("Too few arguments, expected: <index_dir>|'-' <so_dump> <query_param>*");
+        if (args.length < 3) {
+            System.out.println("Too few arguments, expected: <index_dir>|'-' <so_dump>|'-'|'!' <query_param>*");
+            return;
+        }
         try {
+            // Substitute the `-` arguments with the default values if necessary
             String index_dir = args[0].equals("-") ? Constants.index_dir : args[0];
+            String dump_file = args[1].equals("-") ? Constants.dump_file : args[1];
             System.out.println("Searching through index in " + index_dir);
-            Searcher searcher = new Searcher(index_dir);
 
-            String query = String.join("", Arrays.copyOfRange(args, 2, args.length));
             long start = System.currentTimeMillis();
+            Searcher searcher = new Searcher(index_dir);
+            String query = String.join("", Arrays.copyOfRange(args, 2, args.length));
             TopDocs hits = searcher.search(query);
-            long end = System.currentTimeMillis();
 
-            System.out.println(hits.totalHits + " documents found, time: " + (end - start) + "ms");
-            RandomAccessFile file = new RandomAccessFile(args[1], "r");
-            for (ScoreDoc score_doc: hits.scoreDocs) {
+            // Open the SO dump if the argument give isn't '!'
+            RandomAccessFile file = dump_file.equals("!") ? null : new RandomAccessFile(dump_file, "r");
+            for (ScoreDoc score_doc : hits.scoreDocs) {
                 Document document = searcher.getDocument(score_doc);
 
                 System.out.println("----------------------------------------");
-                for (IndexableField field: document.getFields())
+                for (IndexableField field : document.getFields())
                     System.out.println(field.name() + "\t" + field.stringValue());
-                if (document.getField("id") != null)
-                    System.out.println(getPost(file, Integer.parseUnsignedInt(document.getField("id").stringValue())));
+
+                // If the document has an ID field, then we assume that it was indexed from the stackoverflow dump
+                // This means that we can use it to retrieve the complete XML element from the dump file
+                if (document.getField("id") != null && file != null) {
+                    String element = getPost(file, Integer.parseUnsignedInt(document.getField("id").stringValue()));
+                    System.out.println(element.replace("\" ", "\"\n\t"));
+                }
             }
             System.out.println("----------------------------------------");
+
+            long end = System.currentTimeMillis();
+            System.out.println(hits.totalHits + " documents found, time: " + (end - start) + "ms");
         } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
@@ -110,10 +123,9 @@ public class Searcher {
      * Returns the post with the given ID as an XML element.
      *
      * @param dump_file The opened stackoverflow dump file.
-     *
      * @return The complete post as an XML element.
      */
-    static public String getPostXML(RandomAccessFile dump_file) throws IOException {
+    static private String getCurrentPost(RandomAccessFile dump_file) throws IOException {
         // Go to the start of the current element
         while (dump_file.read() != '<')
             dump_file.seek(dump_file.getFilePointer() - 2);
@@ -140,12 +152,11 @@ public class Searcher {
      * files.
      *
      * @param dump_file The opened stackoverflow dump file.
-     *
      * @return The current post's ID, or -1 if something went wrong.
      */
     static private int getPostId(RandomAccessFile dump_file) throws IOException {
         // Get the current XML element from the file
-        String element = getPostXML(dump_file);
+        String element = getCurrentPost(dump_file);
         if (element.isEmpty())
             return -1;
 
@@ -161,6 +172,14 @@ public class Searcher {
         return Integer.parseUnsignedInt(result.toString());
     }
 
+    /**
+     * Returns the XML element in the stackoverflow dump file with the given ID. This function assumes that the XML file
+     * is ordered on this ID attribute (low to high). This allows us to use a binary search algorithm.
+     *
+     * @param dump_file The opened stackoverflow dump file.
+     * @param post_id The ID of the post that we're looking for.
+     * @return The XML element with the given ID.
+     */
     static public String getPost(RandomAccessFile dump_file, int post_id) throws IOException {
         long interval_start = 0;
         long interval_end = dump_file.length();
@@ -178,6 +197,6 @@ public class Searcher {
                 interval_end = current_position;
         } while (current_post != post_id);
 
-        return getPostXML(dump_file);
+        return getCurrentPost(dump_file);
     }
 }
