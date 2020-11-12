@@ -19,6 +19,16 @@ java -classpath out/production/Lucene:lib/* com.informationretrieval.lucene.
 
 This should then be concatenated with one of the following commands.
 
+In short, the following commands can be used to index the stackoverflow dump,
+and to search through the index. (In this case we assume that you're in the
+project root, that the index will be stored in `./Index`, and that the XML dump
+can be found in `./Posts.xml`.)
+
+```bash
+Indexer -d
+Searcher <query>
+```
+
 ### Indexer
 
 ```bash
